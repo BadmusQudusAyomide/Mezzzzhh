@@ -37,6 +37,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "https://randomuser.me/api/portraits/men/1.jpg",
     },
+    cover: {
+      type: String,
+      default:
+        "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&h=400&fit=crop",
+    },
     bio: {
       type: String,
       maxlength: [200, "Bio cannot exceed 200 characters"],
@@ -149,4 +154,3 @@ userSchema.methods.getPublicProfile = function () {
 userSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("User", userSchema);
- 

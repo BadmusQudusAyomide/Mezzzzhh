@@ -122,7 +122,7 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { fullName, bio, website, location, avatar } = req.body;
+    const { fullName, bio, website, location, avatar, cover } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -137,6 +137,7 @@ const updateProfile = async (req, res) => {
     if (website !== undefined) user.website = website;
     if (location !== undefined) user.location = location;
     if (avatar) user.avatar = avatar;
+    if (cover) user.cover = cover;
 
     await user.save();
 

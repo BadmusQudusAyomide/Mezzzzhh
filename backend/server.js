@@ -48,7 +48,17 @@ mongoose
   });
 
 // Routes
-app.get("/", (req, res) => {
+// Remove or comment out the root endpoint
+// app.get("/", (req, res) => {
+//   res.json({
+//     message: "Welcome to Mesh API",
+//     version: "1.0.0",
+//     status: "running",
+//   });
+// });
+
+// Add the test endpoint at /connection
+app.get("/connection", (req, res) => {
   res.json({
     message: "Welcome to Mesh API",
     version: "1.0.0",
@@ -89,7 +99,3 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
 });
-
-
-
-
