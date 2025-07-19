@@ -175,10 +175,105 @@ const logout = async (req, res) => {
   }
 };
 
+// @desc    Get user profile by username
+// @route   GET /api/auth/profile/:username
+// @access  Public
+const getUserProfile = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const user = await User.findOne({ username })
+      .populate("followers", "username fullName avatar")
+      .populate("following", "username fullName avatar")
+      .select("-password -email");
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found",
+      });
+    }
+
+    // Check if the requesting user is following this user
+    let isFollowing = false;
+    if (req.user) {
+      isFollowing = user.followers.some(
+        (follower) => follower._id.toString() === req.user._id.toString()
+      );
+    }
+
+    res.json({
+      user: user.getPublicProfile(),
+      isFollowing,
+    });
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    res.status(500).json({
+      error: "Server error",
+    });
+  }
+};
+
+// @desc    Follow/Unfollow user
+// @route   POST /api/auth/follow/:userId
+// @access  Private
+const followUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user._id;
+
+    if (currentUserId.toString() === userId) {
+      return res.status(400).json({
+        error: "You cannot follow yourself",
+      });
+    }
+
+    const userToFollow = await User.findById(userId);
+    const currentUser = await User.findById(currentUserId);
+
+    if (!userToFollow || !currentUser) {
+      return res.status(404).json({
+        error: "User not found",
+      });
+    }
+
+    const isFollowing = currentUser.following.includes(userId);
+
+    if (isFollowing) {
+      // Unfollow
+      currentUser.following = currentUser.following.filter(
+        (id) => id.toString() !== userId
+      );
+      userToFollow.followers = userToFollow.followers.filter(
+        (id) => id.toString() !== currentUserId.toString()
+      );
+    } else {
+      // Follow
+      currentUser.following.push(userId);
+      userToFollow.followers.push(currentUserId);
+    }
+
+    await Promise.all([currentUser.save(), userToFollow.save()]);
+
+    res.json({
+      message: isFollowing
+        ? "Unfollowed successfully"
+        : "Followed successfully",
+      isFollowing: !isFollowing,
+    });
+  } catch (error) {
+    console.error("Follow/Unfollow error:", error);
+    res.status(500).json({
+      error: "Server error",
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
   updateProfile,
   logout,
+  getUserProfile,
+  followUser,
 };
