@@ -20,6 +20,7 @@ app.use(
       process.env.FRONTEND_URL || "http://localhost:5173",
       "https://mesh-blush.vercel.app",
       "https://mesh-blush.vercel.app/",
+      "https://mezzzzhh-production.up.railway.app",
     ],
     credentials: true,
   })
