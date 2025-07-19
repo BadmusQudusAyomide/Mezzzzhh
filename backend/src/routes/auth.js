@@ -25,3 +25,4 @@ router.get("/profile/:username", getUserProfile); // Public route
 router.post("/follow/:userId", auth, followUser); // Protected route
 
 module.exports = router;
+ 

@@ -149,3 +149,4 @@ userSchema.methods.getPublicProfile = function () {
 userSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("User", userSchema);
+ 
