@@ -34,6 +34,7 @@ const register = async (req, res) => {
       fullName,
     });
 
+    
     await user.save();
 
     // Generate token
