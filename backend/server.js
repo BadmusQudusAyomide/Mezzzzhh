@@ -49,15 +49,14 @@ mongoose
   });
 
 // Routes
-// Remove or comment out the root endpoint
-// app.get("/", (req, res) => {
-//   res.json({
-//     message: "Welcome to Mesh API",
-//     version: "1.0.0",
-//     status: "running",
-//   });
-// });
-
+// Root endpoint for Railway health check
+app.get("/", (req, res) => {
+  res.json({
+    message: "Welcome to Mesh API",
+    version: "1.0.0",
+    status: "running",
+  });
+});
 // Add the test endpoint at /connection
 app.get("/connection", (req, res) => {
   res.json({
@@ -101,5 +100,3 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
 });
-
-
