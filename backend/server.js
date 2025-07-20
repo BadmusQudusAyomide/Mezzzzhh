@@ -96,6 +96,15 @@ app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
+// Add process-level error handlers for debugging
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+console.log("About to start listening...");
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
