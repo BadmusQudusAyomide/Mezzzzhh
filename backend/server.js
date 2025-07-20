@@ -8,6 +8,7 @@ require("dotenv").config();
 
 // Import routes
 const authRoutes = require("./src/routes/auth");
+const postRoutes = require("./src/routes/post");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -68,6 +69,7 @@ app.get("/connection", (req, res) => {
 
 // API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/posts", postRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
