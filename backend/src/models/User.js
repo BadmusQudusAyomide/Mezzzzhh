@@ -111,17 +111,17 @@ const userSchema = new mongoose.Schema(
 
 // Virtual for follower count
 userSchema.virtual("followerCount").get(function () {
-  return this.followers.length;
+  return Array.isArray(this.followers) ? this.followers.length : 0;
 });
 
 // Virtual for following count
 userSchema.virtual("followingCount").get(function () {
-  return this.following.length;
+  return Array.isArray(this.following) ? this.following.length : 0;
 });
 
 // Virtual for post count
 userSchema.virtual("postCount").get(function () {
-  return this.posts.length;
+  return Array.isArray(this.posts) ? this.posts.length : 0;
 });
 
 // Hash password before saving
