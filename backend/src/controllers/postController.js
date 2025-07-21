@@ -1,5 +1,6 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 
 // @desc    Create a new post
 // @route   POST /api/posts
@@ -110,6 +111,26 @@ const likePost = async (req, res) => {
         select: "_id fullName username avatar isVerified",
         options: { strictPopulate: false },
       });
+    // Emit real-time update
+    const io = req.app.get("io");
+    io.emit("postUpdated", post);
+    // Create notification for post owner (if not self)
+    if (post.user && post.user._id.toString() !== userId.toString() && !liked) {
+      const notification = await Notification.create({
+        user: post.user._id,
+        type: "like",
+        from: userId,
+        post: post._id,
+        text: `${req.user.fullName} liked your post`,
+      });
+      console.log(
+        "[Socket.IO] Emitting LIKE notification to user:",
+        post.user._id.toString(),
+        notification
+      );
+      
+      io.to(post.user._id.toString()).emit("notification", notification);
+    }
     res.json({
       liked: !liked,
       likesCount: post.likes.length,
@@ -151,6 +172,25 @@ const addComment = async (req, res) => {
         select: "_id fullName username avatar isVerified",
         options: { strictPopulate: false },
       });
+    // Emit real-time update
+    const io = req.app.get("io");
+    io.emit("postUpdated", post);
+    // Create notification for post owner (if not self)
+    if (post.user && post.user._id.toString() !== req.user._id.toString()) {
+      const notification = await Notification.create({
+        user: post.user._id,
+        type: "comment",
+        from: req.user._id,
+        post: post._id,
+        text: `${req.user.fullName} commented: "${text}"`,
+      });
+      console.log(
+        "[Socket.IO] Emitting COMMENT notification to user:",
+        post.user._id.toString(),
+        notification
+      );
+      io.to(post.user._id.toString()).emit("notification", notification);
+    }
     res.status(201).json({
       comment: post.comments[post.comments.length - 1],
       post,

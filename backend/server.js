@@ -5,6 +5,8 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
+const http = require("http");
+const { Server } = require("socket.io");
 
 // Import routes
 const authRoutes = require("./src/routes/auth");
@@ -12,6 +14,19 @@ const postRoutes = require("./src/routes/post");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: [
+      process.env.FRONTEND_URL || "http://localhost:5173",
+      "https://mesh-blush.vercel.app",
+      "https://mesh-blush.vercel.app/",
+      "https://mezzzzhh-production.up.railway.app",
+    ],
+    credentials: true,
+  },
+});
+app.set("io", io);
 
 // Middleware
 app.use(helmet());
@@ -70,6 +85,22 @@ app.get("/connection", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
 
+// Socket.IO connection and join logic
+io.on("connection", (socket) => {
+  console.log("[Socket.IO] New client connected:", socket.id);
+  socket.on("join", (userId) => {
+    if (userId) {
+      socket.join(userId);
+      console.log(
+        `[Socket.IO] Socket ${socket.id} joined room for user: ${userId}`
+      );
+    }
+  });
+  socket.on("disconnect", () => {
+    console.log("[Socket.IO] Client disconnected:", socket.id);
+  });
+});
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({
@@ -105,7 +136,9 @@ process.on("uncaughtException", (err) => {
 });
 
 console.log("About to start listening...");
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || "development"}`);
 });
+
+module.exports = { io };
