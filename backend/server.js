@@ -11,6 +11,8 @@ const { Server } = require("socket.io");
 // Import routes
 const authRoutes = require("./src/routes/auth");
 const postRoutes = require("./src/routes/post");
+const userRoutes = require("./src/routes/userRoutes");
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -53,14 +55,18 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
+
 // Database connection
+console.log(`Attempting to connect to MongoDB... URI loaded: ${!!process.env.MONGODB_URI}`);
 mongoose
   .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/mesh")
   .then(() => {
     console.log("✅ Connected to MongoDB");
   })
   .catch((error) => {
-    console.error("❌ MongoDB connection error:", error);
+    console.error("❌ MongoDB connection error:", error.message);
+    console.error("Full error object:", error);
+    process.exit(1);
   });
 
 // Routes
@@ -84,6 +90,7 @@ app.get("/connection", (req, res) => {
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/users", userRoutes);
 
 // Socket.IO connection and join logic
 io.on("connection", (socket) => {

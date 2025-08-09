@@ -104,11 +104,16 @@ const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .populate("followers", "username fullName avatar")
-      .populate("following", "username fullName avatar")
       .select("-password");
 
+    // Add follower count to the user object and convert following to array of IDs
+    const userWithFollowers = user.getPublicProfile();
+    userWithFollowers.followerCount = user.followers.length;
+    // Convert following array to just IDs for frontend compatibility
+    userWithFollowers.following = user.following.map(id => id.toString());
+
     res.json({
-      user: user.getPublicProfile(),
+      user: userWithFollowers,
     });
   } catch (error) {
     console.error("Get me error:", error);
@@ -186,7 +191,6 @@ const getUserProfile = async (req, res) => {
 
     const user = await User.findOne({ username })
       .populate("followers", "username fullName avatar")
-      .populate("following", "username fullName avatar")
       .select("-password -email");
 
     if (!user) {
@@ -203,8 +207,14 @@ const getUserProfile = async (req, res) => {
       );
     }
 
+    // Add follower count to the user object and convert following to array of IDs
+    const userWithFollowers = user.getPublicProfile();
+    userWithFollowers.followerCount = user.followers.length;
+    // Convert following array to just IDs for frontend compatibility
+    userWithFollowers.following = user.following.map(id => id.toString());
+
     res.json({
-      user: user.getPublicProfile(),
+      user: userWithFollowers,
       isFollowing,
     });
   } catch (error) {

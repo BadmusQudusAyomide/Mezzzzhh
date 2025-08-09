@@ -37,6 +37,11 @@ const getPosts = async (req, res) => {
         select: "fullName username avatar isVerified",
         options: { strictPopulate: false },
       })
+      .populate({
+        path: "comments.user",
+        select: "_id fullName username avatar isVerified",
+        options: { strictPopulate: false },
+      })
       .sort({ createdAt: -1 });
     // Filter out posts with missing user (null after population)
     const filteredPosts = posts
@@ -45,6 +50,8 @@ const getPosts = async (req, res) => {
         const obj = post.toObject();
         obj.likes = Array.isArray(obj.likes) ? obj.likes : [];
         obj.comments = Array.isArray(obj.comments) ? obj.comments : [];
+        // Add userId field (original post.user ObjectId)
+        obj.userId = post.user && post.user._id ? post.user._id : post.user;
         return obj;
       });
     res.json({ posts: filteredPosts });
@@ -73,8 +80,19 @@ const getPostsByUsername = async (req, res) => {
         select: "fullName username avatar isVerified",
         options: { strictPopulate: false },
       })
+      .populate({
+        path: "comments.user",
+        select: "_id fullName username avatar isVerified",
+        options: { strictPopulate: false },
+      })
       .sort({ createdAt: -1 });
-    res.json({ posts });
+    // Add userId to each post
+    const postsWithUserId = posts.map((post) => {
+      const obj = post.toObject();
+      obj.userId = post.user && post.user._id ? post.user._id : post.user;
+      return obj;
+    });
+    res.json({ posts: postsWithUserId });
   } catch (error) {
     console.error("Get posts by username error:", error.message, error.stack);
     res.status(500).json({
@@ -128,7 +146,7 @@ const likePost = async (req, res) => {
         post.user._id.toString(),
         notification
       );
-      
+
       io.to(post.user._id.toString()).emit("notification", notification);
     }
     res.json({
