@@ -24,7 +24,10 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      // Password required only for local accounts (no OAuth provider)
+      required: function () {
+        return !this.provider;
+      },
       minlength: [6, "Password must be at least 6 characters long"],
     },
     fullName: {
@@ -152,6 +155,16 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // OAuth fields
+    provider: {
+      type: String, // 'google' | 'github' | undefined
+      default: undefined,
+    },
+    providerId: {
+      type: String,
+      default: undefined,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -190,6 +203,7 @@ userSchema.pre("save", async function (next) {
 
 // Method to compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
 };
 

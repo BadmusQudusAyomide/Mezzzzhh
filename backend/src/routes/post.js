@@ -10,6 +10,7 @@ const {
 } = require("../controllers/postController");
 const Notification = require("../models/Notification");
 
+
 // Create a new post
 router.post("/", auth, createPost);
 // Get all posts

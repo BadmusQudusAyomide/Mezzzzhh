@@ -9,6 +9,10 @@ const {
   logout,
   getUserProfile,
   followUser,
+  oauthGoogleStart,
+  oauthGoogleCallback,
+  oauthGithubStart,
+  oauthGithubCallback,
 } = require("../controllers/authController");
 
 // Public routes
@@ -23,6 +27,12 @@ router.post("/logout", auth, logout);
 // Profile routes
 router.get("/profile/:username", getUserProfile); // Public route
 router.post("/follow/:userId", auth, followUser); // Protected route
+
+// OAuth routes
+router.get("/oauth/google", oauthGoogleStart);
+router.get("/oauth/google/callback", oauthGoogleCallback);
+router.get("/oauth/github", oauthGithubStart);
+router.get("/oauth/github/callback", oauthGithubCallback);
 
 module.exports = router;
  
