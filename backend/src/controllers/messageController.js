@@ -1,15 +1,18 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
 
-// @desc    Get conversations for current user
+// @desc    Get conversations for current user with pagination
 // @route   GET /api/messages/conversations
 // @access  Private
 const getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
 
-    // Get all unique conversations for the user
-    const conversations = await Message.aggregate([
+    // Get all unique conversations for the user with pagination
+    const conversationsAggregate = await Message.aggregate([
       {
         $match: {
           $or: [
@@ -85,7 +88,26 @@ const getConversations = async (req, res) => {
       }
     ]);
 
-    res.json({ conversations });
+    // Get total count for pagination
+    const totalConversations = conversationsAggregate.length;
+    
+    // Apply pagination
+    const conversations = conversationsAggregate.slice(skip, skip + limit);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalConversations / limit);
+    const hasMore = page < totalPages;
+
+    res.json({ 
+      conversations,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalConversations,
+        hasMore,
+        limit
+      }
+    });
   } catch (error) {
     console.error("Get conversations error:", error);
     res.status(500).json({ error: "Server error while fetching conversations" });

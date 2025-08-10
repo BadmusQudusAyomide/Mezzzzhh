@@ -26,11 +26,20 @@ const createPost = async (req, res) => {
   }
 };
 
-// @desc    Get all posts
+// @desc    Get all posts (paginated)
 // @route   GET /api/posts
 // @access  Public
 const getPosts = async (req, res) => {
   try {
+    const page = parseInt(req.query.page || 1);
+    const limit = parseInt(req.query.limit || 10);
+    const skip = (page - 1) * limit;
+
+    // Total count for pagination
+    const totalPosts = await Post.countDocuments();
+    const totalPages = Math.ceil(totalPosts / limit) || 1;
+    const hasMore = page < totalPages;
+
     const posts = await Post.find()
       .populate({
         path: "user",
@@ -42,7 +51,10 @@ const getPosts = async (req, res) => {
         select: "_id fullName username avatar isVerified",
         options: { strictPopulate: false },
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
     // Filter out posts with missing user (null after population)
     const filteredPosts = posts
       .filter((post) => post.user)
@@ -54,7 +66,17 @@ const getPosts = async (req, res) => {
         obj.userId = post.user && post.user._id ? post.user._id : post.user;
         return obj;
       });
-    res.json({ posts: filteredPosts });
+
+    res.json({
+      posts: filteredPosts,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalPosts,
+        hasMore,
+        limit,
+      },
+    });
   } catch (error) {
     console.error("Get posts error:", error.message, error.stack);
     res.status(500).json({
@@ -70,10 +92,23 @@ const getPosts = async (req, res) => {
 const getPostsByUsername = async (req, res) => {
   try {
     const { username } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    
     const user = await User.findOne({ username });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
+
+    // Convert page and limit to numbers
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination metadata
+    const totalPosts = await Post.countDocuments({ user: user._id });
+    const totalPages = Math.ceil(totalPosts / limitNum);
+    const hasMore = pageNum < totalPages;
+
     const posts = await Post.find({ user: user._id })
       .populate({
         path: "user",
@@ -85,14 +120,28 @@ const getPostsByUsername = async (req, res) => {
         select: "_id fullName username avatar isVerified",
         options: { strictPopulate: false },
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
     // Add userId to each post
     const postsWithUserId = posts.map((post) => {
       const obj = post.toObject();
       obj.userId = post.user && post.user._id ? post.user._id : post.user;
       return obj;
     });
-    res.json({ posts: postsWithUserId });
+
+    // Return posts with pagination metadata
+    res.json({ 
+      posts: postsWithUserId,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalPosts,
+        hasMore,
+        limit: limitNum
+      }
+    });
   } catch (error) {
     console.error("Get posts by username error:", error.message, error.stack);
     res.status(500).json({

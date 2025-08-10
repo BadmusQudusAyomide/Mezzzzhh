@@ -21,15 +21,39 @@ router.post("/:postId/like", auth, likePost);
 // Add a comment to a post
 router.post("/:postId/comments", auth, addComment);
 
-// Get notifications for the current user
+// Get notifications for the current user with pagination
 router.get("/notifications", auth, async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination info
+    const totalNotifications = await Notification.countDocuments({ user: req.user._id });
+    
     const notifications = await Notification.find({ user: req.user._id })
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate("from", "fullName avatar username")
       .populate("post", "content image");
-    res.json({ notifications });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalNotifications / limit);
+    const hasMore = page < totalPages;
+
+    res.json({ 
+      notifications,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalNotifications,
+        hasMore,
+        limit
+      }
+    });
   } catch (error) {
+    console.error("Failed to fetch notifications:", error);
     res.status(500).json({ error: "Failed to fetch notifications" });
   }
 });
