@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
-      default: "https://randomuser.me/api/portraits/men/1.jpg",
+      default: "",
     },
     cover: {
       type: String,
@@ -52,6 +52,57 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
     location: {
+      type: String,
+      default: "",
+    },
+    // Extended profile fields
+    birthday: {
+      type: Date,
+      default: null,
+    },
+    gender: {
+      type: String,
+      enum: [
+        "male",
+        "female",
+        "other",
+        "prefer_not_to_say",
+        "",
+      ],
+      default: "",
+    },
+    relationshipStatus: {
+      type: String,
+      enum: [
+        "single",
+        "in_a_relationship",
+        "engaged",
+        "married",
+        "complicated",
+        "separated",
+        "divorced",
+        "widowed",
+        "",
+      ],
+      default: "",
+    },
+    workplace: {
+      type: String,
+      default: "",
+    },
+    education: {
+      type: String,
+      default: "",
+    },
+    hometown: {
+      type: String,
+      default: "",
+    },
+    currentCity: {
+      type: String,
+      default: "",
+    },
+    phone: {
       type: String,
       default: "",
     },

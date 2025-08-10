@@ -10,6 +10,11 @@ exports.followUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Prevent self-follow
+    if (userToFollow._id.toString() === currentUser._id.toString()) {
+      return res.status(400).json({ message: "You can't follow yourself" });
+    }
+
     if (currentUser.following.includes(userToFollow._id)) {
       // Unfollow logic
       currentUser.following.pull(userToFollow._id);
@@ -30,6 +35,28 @@ exports.followUser = async (req, res) => {
 
       await currentUser.save();
       await userToFollow.save();
+
+      // Create a follow notification for the recipient
+      const note = await Notification.create({
+        user: userToFollow._id,
+        type: 'follow',
+        from: currentUser._id,
+        text: `${currentUser.fullName} started following you`,
+      });
+
+      // Populate minimal fields for realtime payload
+      const populated = await Notification.findById(note._id)
+        .populate('from', 'fullName avatar username');
+
+      // Emit real-time notification via Socket.IO (recipient room)
+      try {
+        const io = req.app.get('io');
+        if (io && userToFollow._id) {
+          io.to(userToFollow._id.toString()).emit('notification', populated);
+        }
+      } catch (e) {
+        console.warn('Socket emit failed for follow notification:', e?.message || e);
+      }
 
       return res.json({ 
         message: 'User followed successfully',

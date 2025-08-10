@@ -133,7 +133,22 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { fullName, bio, website, location, avatar, cover } = req.body;
+    const {
+      fullName,
+      bio,
+      website,
+      location,
+      avatar,
+      cover,
+      birthday,
+      gender,
+      relationshipStatus,
+      workplace,
+      education,
+      hometown,
+      currentCity,
+      phone,
+    } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -147,8 +162,16 @@ const updateProfile = async (req, res) => {
     if (bio !== undefined) user.bio = bio;
     if (website !== undefined) user.website = website;
     if (location !== undefined) user.location = location;
-    if (avatar) user.avatar = avatar;
-    if (cover) user.cover = cover;
+    if (avatar !== undefined) user.avatar = avatar;
+    if (cover !== undefined) user.cover = cover;
+    if (birthday !== undefined) user.birthday = birthday ? new Date(birthday) : null;
+    if (gender !== undefined) user.gender = gender;
+    if (relationshipStatus !== undefined) user.relationshipStatus = relationshipStatus;
+    if (workplace !== undefined) user.workplace = workplace;
+    if (education !== undefined) user.education = education;
+    if (hometown !== undefined) user.hometown = hometown;
+    if (currentCity !== undefined) user.currentCity = currentCity;
+    if (phone !== undefined) user.phone = phone;
 
     await user.save();
 
