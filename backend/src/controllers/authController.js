@@ -9,6 +9,50 @@ const generateToken = (userId) => {
   });
 };
 
+// @desc    List users excluding current user, with search & pagination (recently joined first)
+// @route   GET /api/auth/users
+// @access  Private
+const getUsers = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+    const query = (req.query.query || req.query.q || '').trim();
+
+    const filters = { _id: { $ne: req.user._id } };
+    if (query) {
+      const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filters.$or = [{ username: regex }, { fullName: regex }];
+    }
+
+    const skip = (page - 1) * limit;
+    const [total, users] = await Promise.all([
+      User.countDocuments(filters),
+      User.find(filters)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('username fullName avatar isVerified followers createdAt'),
+    ]);
+
+    const list = users.map((u) => ({
+      _id: u._id,
+      username: u.username,
+      fullName: u.fullName,
+      avatar: u.avatar,
+      isVerified: !!u.isVerified,
+      followerCount: Array.isArray(u.followers) ? u.followers.length : 0,
+      createdAt: u.createdAt,
+    }));
+
+    const totalPages = Math.ceil(total / limit) || 1;
+    const hasMore = page < totalPages;
+    return res.json({ users: list, page, totalPages, total, hasMore });
+  } catch (error) {
+    console.error('Get users list error:', error);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // @desc    Get user suggestions (random), excluding current user and those already followed
 // @route   GET /api/auth/suggestions
 // @access  Private
@@ -455,6 +499,7 @@ module.exports = {
   login,
   getMe,
   getUserSuggestions,
+  getUsers,
   updateProfile,
   logout,
   getUserProfile,
