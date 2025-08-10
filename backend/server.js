@@ -105,6 +105,12 @@ io.on("connection", (socket) => {
       );
     }
   });
+  // Relay typing events to recipient room
+  socket.on("typing", ({ senderId, recipientId }) => {
+    if (!recipientId) return;
+    console.log(`[Socket.IO] typing from ${senderId} -> ${recipientId}`);
+    io.to(recipientId.toString()).emit("typing", { senderId, recipientId });
+  });
   socket.on("disconnect", () => {
     console.log("[Socket.IO] Client disconnected:", socket.id);
   });
