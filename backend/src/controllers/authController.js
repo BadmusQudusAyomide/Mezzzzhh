@@ -9,6 +9,44 @@ const generateToken = (userId) => {
   });
 };
 
+// @desc    Get user suggestions (random), excluding current user and those already followed
+// @route   GET /api/auth/suggestions
+// @access  Private
+const getUserSuggestions = async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 5, 20);
+
+    // Load current user to get following list
+    const me = await User.findById(req.user._id).select('following');
+    if (!me) return res.status(404).json({ error: 'User not found' });
+
+    const excludeIds = [req.user._id, ...(me.following || [])];
+
+    // Prefer $sample for randomness
+    const pipeline = [
+      { $match: { _id: { $nin: excludeIds } } },
+      { $sample: { size: limit } },
+      { $project: { username: 1, fullName: 1, avatar: 1, isVerified: 1, followers: 1 } },
+    ];
+
+    const docs = await User.aggregate(pipeline);
+
+    const suggestions = docs.map((u) => ({
+      _id: u._id,
+      username: u.username,
+      fullName: u.fullName,
+      avatar: u.avatar,
+      isVerified: !!u.isVerified,
+      followerCount: Array.isArray(u.followers) ? u.followers.length : 0,
+    }));
+
+    return res.json({ suggestions, limit });
+  } catch (error) {
+    console.error('Get user suggestions error:', error);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // @desc    Get followers list by username
 // @route   GET /api/auth/profile/:username/followers
 // @access  Public
@@ -416,6 +454,7 @@ module.exports = {
   register,
   login,
   getMe,
+  getUserSuggestions,
   updateProfile,
   logout,
   getUserProfile,

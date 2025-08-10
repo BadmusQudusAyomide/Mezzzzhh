@@ -5,6 +5,7 @@ const {
   register,
   login,
   getMe,
+  getUserSuggestions,
   updateProfile,
   logout,
   getUserProfile,
@@ -25,6 +26,7 @@ router.post("/login", login);
 router.get("/me", auth, getMe);
 router.put("/profile", auth, updateProfile);
 router.post("/logout", auth, logout);
+router.get("/suggestions", auth, getUserSuggestions);
 
 // Profile routes
 router.get("/profile/:username", getUserProfile); // Public route
