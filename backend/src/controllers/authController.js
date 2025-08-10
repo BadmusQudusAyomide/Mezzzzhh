@@ -9,6 +9,85 @@ const generateToken = (userId) => {
   });
 };
 
+// @desc    Get followers list by username
+// @route   GET /api/auth/profile/:username/followers
+// @access  Public
+const getFollowersList = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+
+    const user = await User.findOne({ username })
+      .populate({ path: "followers", select: "username fullName avatar bio" })
+      .select("followers");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const total = user.followers.length;
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const items = user.followers.slice(start, end);
+
+    res.json({
+      total,
+      page,
+      limit,
+      followers: items.map((u) => ({
+        _id: u._id,
+        username: u.username,
+        fullName: u.fullName,
+        avatar: u.avatar,
+        bio: u.bio || "",
+      })),
+    });
+  } catch (error) {
+    console.error("Get followers list error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// @desc    Get following list by username
+// @route   GET /api/auth/profile/:username/following
+// @access  Public
+const getFollowingList = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+
+    const user = await User.findOne({ username })
+      .populate({ path: "following", select: "username fullName avatar bio" })
+      .select("following");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const total = user.following.length;
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const items = user.following.slice(start, end);
+
+    res.json({
+      total,
+      page,
+      limit,
+      following: items.map((u) => ({
+        _id: u._id,
+        username: u.username,
+        fullName: u.fullName,
+        avatar: u.avatar,
+        bio: u.bio || "",
+      })),
+    });
+  } catch (error) {
+    console.error("Get following list error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
 // Helper: generate a unique username from a base (e.g., first name)
 const generateUniqueUsername = async (base) => {
   const clean = (base || "user")
@@ -136,6 +215,9 @@ const getMe = async (req, res) => {
     // Add follower count to the user object and convert following to array of IDs
     const userWithFollowers = user.getPublicProfile();
     userWithFollowers.followerCount = user.followers.length;
+    userWithFollowers.followingCount = Array.isArray(user.following)
+      ? user.following.length
+      : 0;
     // Convert following array to just IDs for frontend compatibility
     userWithFollowers.following = user.following.map(id => id.toString());
 
@@ -338,6 +420,8 @@ module.exports = {
   logout,
   getUserProfile,
   followUser,
+  getFollowersList,
+  getFollowingList,
   // OAuth handlers will be appended by further export below
 };
 

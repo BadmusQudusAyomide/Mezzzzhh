@@ -9,6 +9,8 @@ const {
   logout,
   getUserProfile,
   followUser,
+  getFollowersList,
+  getFollowingList,
   oauthGoogleStart,
   oauthGoogleCallback,
   oauthGithubStart,
@@ -29,6 +31,8 @@ router.get("/profile/:username", getUserProfile); // Public route
 router.post("/follow/:userId", auth, followUser); // Protected route
 
 // OAuth routes
+router.get("/profile/:username/followers", getFollowersList); // Public list
+router.get("/profile/:username/following", getFollowingList); // Public list
 router.get("/oauth/google", oauthGoogleStart);
 router.get("/oauth/google/callback", oauthGoogleCallback);
 router.get("/oauth/github", oauthGithubStart);
