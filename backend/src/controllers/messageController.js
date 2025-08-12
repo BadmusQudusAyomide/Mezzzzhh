@@ -283,5 +283,19 @@ module.exports = {
   getMessages,
   sendMessage,
   markAsRead,
-  getMutualFollowers
+  getMutualFollowers,
+  /** Return total unread messages for current user */
+  async getUnreadCount(req, res) {
+    try {
+      const userId = req.user._id;
+      const count = await require('../models/Message').countDocuments({
+        recipient: userId,
+        isRead: false,
+      });
+      res.json({ count });
+    } catch (error) {
+      console.error('Get unread messages count error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
 };

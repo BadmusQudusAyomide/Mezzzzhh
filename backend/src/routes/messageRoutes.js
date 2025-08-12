@@ -5,7 +5,8 @@ const {
   getMessages, 
   sendMessage, 
   markAsRead,
-  getMutualFollowers 
+  getMutualFollowers,
+  getUnreadCount,
 } = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
 
@@ -14,6 +15,9 @@ router.get('/conversations', auth, getConversations);
 
 // Get mutual followers for new chat
 router.get('/mutual-followers', auth, getMutualFollowers);
+
+// Get total unread messages count (must be before dynamic :userId route)
+router.get('/unread-count/total', auth, getUnreadCount);
 
 // Get messages between two users
 router.get('/:userId', auth, getMessages);
