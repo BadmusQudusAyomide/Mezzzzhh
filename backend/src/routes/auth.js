@@ -23,6 +23,7 @@ const {
 router.post("/register", register);
 router.post("/login", login);
 
+
 // Protected routes
 router.get("/me", auth, getMe);
 router.put("/profile", auth, updateProfile);

@@ -22,6 +22,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       process.env.FRONTEND_URL || "http://localhost:5173",
+      "http://127.0.0.1:5173",
       "https://mesh-blush.vercel.app",
       "https://mesh-blush.vercel.app/",
       "https://mezzzzhh-production.up.railway.app",
@@ -37,6 +38,7 @@ app.use(
   cors({
     origin: [
       process.env.FRONTEND_URL || "http://localhost:5173",
+      "http://127.0.0.1:5173",
       "https://mesh-blush.vercel.app",
       "https://mesh-blush.vercel.app/",
       "https://mezzzzhh-production.up.railway.app",
@@ -51,8 +53,16 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === "production" ? 600 : 100000,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: "Too many requests from this IP, please try again later.",
+  // Skip limiting entirely in development and for localhost IPs
+  skip: (req, _res) => {
+    if (process.env.NODE_ENV !== "production") return true;
+    const ip = req.ip || "";
+    return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+  },
 });
 app.use("/api/", limiter);
 
