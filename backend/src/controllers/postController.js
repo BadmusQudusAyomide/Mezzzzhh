@@ -1,6 +1,7 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
+const { sendPushToUser } = require("../utils/pushSender");
 
 // @desc    Create a new post
 // @route   POST /api/posts
@@ -197,6 +198,13 @@ const likePost = async (req, res) => {
       );
 
       io.to(post.user._id.toString()).emit("notification", notification);
+      // Also send Web Push for LIKE
+      sendPushToUser(post.user._id, {
+        title: "New like",
+        body: `${req.user.fullName} liked your post`,
+        url: `/posts/${post._id}`,
+        tag: "mesh-like",
+      });
     }
     res.json({
       liked: !liked,
@@ -257,6 +265,13 @@ const addComment = async (req, res) => {
         notification
       );
       io.to(post.user._id.toString()).emit("notification", notification);
+      // Also send Web Push for COMMENT
+      sendPushToUser(post.user._id, {
+        title: "New comment",
+        body: `${req.user.fullName} commented on your post`,
+        url: `/posts/${post._id}`,
+        tag: "mesh-comment",
+      });
     }
     res.status(201).json({
       comment: post.comments[post.comments.length - 1],

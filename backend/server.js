@@ -13,6 +13,7 @@ const authRoutes = require("./src/routes/auth");
 const postRoutes = require("./src/routes/post");
 const userRoutes = require("./src/routes/userRoutes");
 const messageRoutes = require("./src/routes/messageRoutes");
+const pushRoutes = require("./src/routes/push");
 
 
 const app = express();
@@ -103,6 +104,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/push", pushRoutes);
 
 // Socket.IO connection and join logic
 io.on("connection", (socket) => {

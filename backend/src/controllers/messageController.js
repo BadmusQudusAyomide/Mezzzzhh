@@ -1,5 +1,6 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
+const { sendPushToUser } = require('../utils/pushSender');
 
 // @desc    Get conversations for current user with pagination
 // @route   GET /api/messages/conversations
@@ -191,6 +192,14 @@ const sendMessage = async (req, res) => {
       // Send to sender for confirmation
       io.to(senderId.toString()).emit('messageSent', message);
     }
+
+    // Also send Web Push to recipient
+    sendPushToUser(recipientId, {
+      title: 'New message',
+      body: `${req.user.fullName} sent you a message`,
+      url: `/inbox`,
+      tag: 'mesh-message',
+    });
 
     res.status(201).json({ message });
   } catch (error) {

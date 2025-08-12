@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const { sendPushToUser } = require('../utils/pushSender');
 
 exports.followUser = async (req, res) => {
   try {
@@ -57,6 +58,14 @@ exports.followUser = async (req, res) => {
       } catch (e) {
         console.warn('Socket emit failed for follow notification:', e?.message || e);
       }
+
+      // Also send Web Push to recipient
+      sendPushToUser(userToFollow._id, {
+        title: 'New follower',
+        body: `${currentUser.fullName} started following you`,
+        url: '/alerts',
+        tag: 'mesh-follow',
+      });
 
       return res.json({ 
         message: 'User followed successfully',
