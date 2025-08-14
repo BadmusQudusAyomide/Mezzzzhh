@@ -7,6 +7,9 @@ const {
   markAsRead,
   getMutualFollowers,
   getUnreadCount,
+  editMessage,
+  addReaction,
+  removeReaction,
 } = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
 
@@ -27,5 +30,12 @@ router.post('/', auth, sendMessage);
 
 // Mark message as read
 router.put('/:messageId/read', auth, markAsRead);
+
+// Edit a message
+router.put('/:messageId', auth, editMessage);
+
+// Reactions
+router.post('/:messageId/reactions', auth, addReaction);
+router.delete('/:messageId/reactions', auth, removeReaction);
 
 module.exports = router;

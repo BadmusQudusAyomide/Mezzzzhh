@@ -22,11 +22,32 @@ const messageSchema = new mongoose.Schema(
       enum: ["text", "image", "file"],
       default: "text",
     },
+    // Reference to a parent message when replying
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+    },
+    // Reactions on this message
+    reactions: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        emoji: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     isRead: {
       type: Boolean,
       default: false,
     },
     readAt: {
+      type: Date,
+    },
+    edited: {
+      type: Boolean,
+      default: false,
+    },
+    editedAt: {
       type: Date,
     },
   },
@@ -40,5 +61,6 @@ const messageSchema = new mongoose.Schema(
 // Index for better query performance
 messageSchema.index({ sender: 1, recipient: 1, createdAt: -1 });
 messageSchema.index({ recipient: 1, isRead: 1 });
+messageSchema.index({ replyTo: 1 });
 
 module.exports = mongoose.model("Message", messageSchema);
