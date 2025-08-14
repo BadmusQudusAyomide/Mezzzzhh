@@ -123,12 +123,20 @@ const getMessages = async (req, res) => {
     const currentUserId = req.user._id;
     const otherUserId = req.params.userId;
 
-    const messages = await Message.find({
+    // Pagination
+    const { before, limit: limitQuery } = req.query;
+    const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 50, 100));
+    const createdAtFilter = before ? { createdAt: { $lt: new Date(isNaN(Number(before)) ? before : Number(before)) } } : {};
+
+    const baseCriteria = {
       $or: [
         { sender: currentUserId, recipient: otherUserId },
         { sender: otherUserId, recipient: currentUserId }
-      ]
-    })
+      ],
+      ...createdAtFilter,
+    };
+
+    const messages = await Message.find(baseCriteria)
     .populate('sender', 'username fullName avatar')
     .populate('recipient', 'username fullName avatar')
     .populate({
@@ -138,22 +146,26 @@ const getMessages = async (req, res) => {
         { path: 'recipient', select: 'username fullName avatar' },
       ],
     })
-    .sort({ createdAt: 1 });
+    .sort({ createdAt: -1 })
+    .limit(limit + 1); // fetch one extra to know if there's more
+
+    // We fetched newest first; keep only latest `limit`, then reverse for ascending display
+    const hasMore = messages.length > limit;
+    const limited = hasMore ? messages.slice(0, limit) : messages;
+    const orderedAsc = limited.slice().reverse();
 
     // Mark messages as read
-    await Message.updateMany(
-      {
-        sender: otherUserId,
-        recipient: currentUserId,
-        isRead: false
-      },
-      {
-        isRead: true,
-        readAt: new Date()
-      }
+    const unreadMessages = orderedAsc.filter(
+      (msg) => msg.recipient.toString() === currentUserId.toString() && !msg.isRead
     );
+    if (unreadMessages.length > 0) {
+      await Message.updateMany(
+        { _id: { $in: unreadMessages.map((m) => m._id) } },
+        { $set: { isRead: true } }
+      );
+    }
 
-    res.json({ messages });
+    res.json({ messages: orderedAsc, hasMore });
   } catch (error) {
     console.error("Get messages error:", error);
     res.status(500).json({ error: "Server error while fetching messages" });
