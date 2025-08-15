@@ -11,8 +11,11 @@ const {
   addReaction,
   removeReaction,
   getThreadMessages,
+  uploadVoiceNote,
 } = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // 25MB limit
 
 // Get conversations
 router.get('/conversations', auth, getConversations);
@@ -31,6 +34,9 @@ router.get('/:userId', auth, getMessages);
 
 // Send a message
 router.post('/', auth, sendMessage);
+
+// Upload a voice note
+router.post('/voice', auth, upload.single('audio'), uploadVoiceNote);
 
 // Mark message as read
 router.put('/:messageId/read', auth, markAsRead);

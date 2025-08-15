@@ -1,6 +1,8 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
 const { sendPushToUser } = require('../utils/pushSender');
+const multer = require('multer');
+const { cloudinary } = require('../utils/cloudinary');
 
 // @desc    Get conversations for current user with pagination
 // @route   GET /api/messages/conversations
@@ -112,6 +114,101 @@ const getConversations = async (req, res) => {
   } catch (error) {
     console.error("Get conversations error:", error);
     res.status(500).json({ error: "Server error while fetching conversations" });
+  }
+};
+
+// @desc    Upload voice note and create audio message
+// @route   POST /api/messages/voice
+// @access  Private
+const uploadVoiceNote = async (req, res) => {
+  try {
+    const senderId = req.user._id;
+    const { recipientId, replyTo = null, duration } = req.body;
+    const file = req.file;
+
+    if (!recipientId) return res.status(400).json({ error: 'recipientId is required' });
+    if (!file) return res.status(400).json({ error: 'audio file is required' });
+
+    const recipient = await User.findById(recipientId);
+    if (!recipient) return res.status(404).json({ error: 'Recipient not found' });
+
+    // Determine threadId from replyTo if provided
+    let threadId = null;
+    if (replyTo) {
+      const parent = await Message.findById(replyTo);
+      if (parent) threadId = parent.threadId ? parent.threadId : parent._id;
+    }
+
+    // Upload to Cloudinary from memory buffer via data URI (avoids extra deps)
+    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    const uploadResult = await cloudinary.uploader.upload(dataUri, {
+      resource_type: 'video', // use 'video' for audio in Cloudinary
+      folder: 'mesh/voice',
+      format: 'mp3',
+      audio_codec: 'mp3',
+      bit_rate: '64k', // smaller for faster streaming
+    });
+
+    const message = new Message({
+      sender: senderId,
+      recipient: recipientId,
+      content: '',
+      messageType: 'audio',
+      audioUrl: uploadResult.secure_url,
+      audioDuration: duration ? Number(duration) : (uploadResult.duration || null),
+      replyTo: replyTo || null,
+      threadId,
+    });
+    await message.save();
+    if (!replyTo && !message.threadId) {
+      message.threadId = message._id;
+      await message.save();
+    }
+
+    await message.populate('sender', 'username fullName avatar');
+    await message.populate('recipient', 'username fullName avatar');
+    if (message.replyTo) {
+      await message.populate({
+        path: 'replyTo',
+        populate: [
+          { path: 'sender', select: 'username fullName avatar' },
+          { path: 'recipient', select: 'username fullName avatar' },
+        ],
+      });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(recipientId.toString()).emit('newMessage', message);
+      io.to(senderId.toString()).emit('messageSent', message);
+    }
+
+    // Also push notification
+    sendPushToUser(recipientId, {
+      title: 'New voice note',
+      body: `${req.user.fullName} sent a voice message`,
+      url: `/inbox`,
+      tag: 'mesh-message',
+    });
+
+    res.status(201).json({ message });
+  } catch (error) {
+    console.error('Upload voice note error:', error);
+    res.status(500).json({ error: 'Server error while uploading voice note' });
+  }
+};
+
+// @desc    Return total unread messages for current user
+// @route   GET /api/messages/unread-count/total
+// @access  Private
+const getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const count = await Message.countDocuments({ recipient: userId, isRead: false });
+    res.json({ count });
+  } catch (error) {
+    console.error('Get unread messages count error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -511,18 +608,6 @@ module.exports = {
   editMessage,
   addReaction,
   removeReaction,
-  /** Return total unread messages for current user */
-  async getUnreadCount(req, res) {
-    try {
-      const userId = req.user._id;
-      const count = await require('../models/Message').countDocuments({
-        recipient: userId,
-        isRead: false,
-      });
-      res.json({ count });
-    } catch (error) {
-      console.error('Get unread messages count error:', error);
-      res.status(500).json({ error: 'Server error' });
-    }
-  }
+  getUnreadCount,
+  uploadVoiceNote,
 };
