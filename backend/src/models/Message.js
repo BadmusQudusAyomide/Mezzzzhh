@@ -22,6 +22,14 @@ const messageSchema = new mongoose.Schema(
       enum: ["text", "image", "file"],
       default: "text",
     },
+    // Thread root id. For a root message, threadId can be the same as _id.
+    // For replies, threadId points to the root message _id.
+    threadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+      index: true,
+    },
     // Reference to a parent message when replying
     replyTo: {
       type: mongoose.Schema.Types.ObjectId,
@@ -62,5 +70,6 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({ sender: 1, recipient: 1, createdAt: -1 });
 messageSchema.index({ recipient: 1, isRead: 1 });
 messageSchema.index({ replyTo: 1 });
+messageSchema.index({ threadId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Message", messageSchema);

@@ -115,7 +115,7 @@ const getConversations = async (req, res) => {
   }
 };
 
-// @desc    Get messages between two users
+// @desc    Get messages between two users (supports search and date range)
 // @route   GET /api/messages/:userId
 // @access  Private
 const getMessages = async (req, res) => {
@@ -124,9 +124,25 @@ const getMessages = async (req, res) => {
     const otherUserId = req.params.userId;
 
     // Pagination
-    const { before, limit: limitQuery } = req.query;
+    const { before, limit: limitQuery, q, start, end } = req.query;
     const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 50, 100));
     const createdAtFilter = before ? { createdAt: { $lt: new Date(isNaN(Number(before)) ? before : Number(before)) } } : {};
+
+    // Optional date range filter (inclusive). If end is provided without time, include end-of-day.
+    const range = {};
+    if (start) {
+      const s = new Date(isNaN(Number(start)) ? start : Number(start));
+      range.$gte = s;
+    }
+    if (end) {
+      const e = new Date(isNaN(Number(end)) ? end : Number(end));
+      // set to end of day if date-only
+      if (!isNaN(e.getTime())) {
+        e.setHours(23, 59, 59, 999);
+        range.$lte = e;
+      }
+    }
+    const rangeFilter = Object.keys(range).length ? { createdAt: range } : {};
 
     const baseCriteria = {
       $or: [
@@ -134,9 +150,17 @@ const getMessages = async (req, res) => {
         { sender: otherUserId, recipient: currentUserId }
       ],
       ...createdAtFilter,
+      ...rangeFilter,
     };
 
-    const messages = await Message.find(baseCriteria)
+    // Optional text search across content and participant names
+    let textCriteria = {};
+    if (q && String(q).trim().length > 0) {
+      const regex = new RegExp(String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      textCriteria = { content: { $regex: regex } };
+    }
+
+    const messages = await Message.find({ ...baseCriteria, ...textCriteria })
     .populate('sender', 'username fullName avatar')
     .populate('recipient', 'username fullName avatar')
     .populate({
@@ -190,15 +214,31 @@ const sendMessage = async (req, res) => {
       return res.status(404).json({ error: "Recipient not found" });
     }
 
+    // Determine threadId: for replies, inherit root threadId from parent or parent._id
+    let threadId = null;
+    if (replyTo) {
+      const parent = await Message.findById(replyTo);
+      if (parent) {
+        threadId = parent.threadId ? parent.threadId : parent._id;
+      }
+    }
+
     const message = new Message({
       sender: senderId,
       recipient: recipientId,
       content,
       messageType,
       replyTo: replyTo || null,
+      threadId: threadId,
     });
 
     await message.save();
+
+    // If this is a root message (no replyTo), set its threadId to itself for easier thread fetch
+    if (!replyTo && !message.threadId) {
+      message.threadId = message._id;
+      await message.save();
+    }
 
     // Populate sender and recipient info
     await message.populate('sender', 'username fullName avatar');
@@ -234,6 +274,40 @@ const sendMessage = async (req, res) => {
   } catch (error) {
     console.error("Send message error:", error);
     res.status(500).json({ error: "Server error while sending message" });
+  }
+};
+
+// @desc    Get messages in a thread (root + replies)
+// @route   GET /api/messages/thread/:threadId
+// @access  Private
+const getThreadMessages = async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const { before, limit: limitQuery } = req.query;
+    const limit = Math.max(1, Math.min(parseInt(limitQuery, 10) || 50, 100));
+    const createdAtFilter = before ? { createdAt: { $lt: new Date(isNaN(Number(before)) ? before : Number(before)) } } : {};
+
+    const messages = await Message.find({ threadId, ...createdAtFilter })
+      .populate('sender', 'username fullName avatar')
+      .populate('recipient', 'username fullName avatar')
+      .populate({
+        path: 'replyTo',
+        populate: [
+          { path: 'sender', select: 'username fullName avatar' },
+          { path: 'recipient', select: 'username fullName avatar' },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit + 1);
+
+    const hasMore = messages.length > limit;
+    const limited = hasMore ? messages.slice(0, limit) : messages;
+    const orderedAsc = limited.slice().reverse();
+
+    res.json({ messages: orderedAsc, hasMore });
+  } catch (error) {
+    console.error('Get thread messages error:', error);
+    res.status(500).json({ error: 'Server error while fetching thread messages' });
   }
 };
 
@@ -431,6 +505,7 @@ module.exports = {
   getConversations,
   getMessages,
   sendMessage,
+  getThreadMessages,
   markAsRead,
   getMutualFollowers,
   editMessage,

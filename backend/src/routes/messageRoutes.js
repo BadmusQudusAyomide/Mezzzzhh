@@ -10,6 +10,7 @@ const {
   editMessage,
   addReaction,
   removeReaction,
+  getThreadMessages,
 } = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
 
@@ -21,6 +22,9 @@ router.get('/mutual-followers', auth, getMutualFollowers);
 
 // Get total unread messages count (must be before dynamic :userId route)
 router.get('/unread-count/total', auth, getUnreadCount);
+
+// Get messages in a thread (root + replies) - placed BEFORE dynamic :userId route
+router.get('/thread/:threadId', auth, getThreadMessages);
 
 // Get messages between two users
 router.get('/:userId', auth, getMessages);
