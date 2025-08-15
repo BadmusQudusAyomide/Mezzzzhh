@@ -290,3 +290,30 @@ module.exports = {
   likePost,
   addComment,
 };
+
+// @desc    Delete a post (owner only)
+// @route   DELETE /api/posts/:postId
+// @access  Private
+const deletePost = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.user._id;
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    if (post.user.toString() !== userId.toString()) {
+      return res.status(403).json({ error: "Not authorized to delete this post" });
+    }
+    await Post.deleteOne({ _id: postId });
+    // Remove from user's posts array if stored
+    await User.findByIdAndUpdate(userId, { $pull: { posts: postId } }).catch(() => {});
+    // Emit real-time deletion
+    const io = req.app.get("io");
+    if (io) io.emit("postDeleted", { postId });
+    return res.json({ message: "Post deleted" });
+  } catch (error) {
+    console.error("Delete post error:", error);
+    return res.status(500).json({ error: "Server error while deleting post" });
+  }
+};
+
+module.exports.deletePost = deletePost;

@@ -7,6 +7,7 @@ const {
   getPostsByUsername,
   likePost,
   addComment,
+  deletePost,
 } = require("../controllers/postController");
 const Notification = require("../models/Notification");
 
@@ -21,6 +22,9 @@ router.get("/user/:username", getPostsByUsername);
 router.post("/:postId/like", auth, likePost);
 // Add a comment to a post
 router.post("/:postId/comments", auth, addComment);
+
+// Delete a post (owner only)
+router.delete("/:postId", auth, deletePost);
 
 // Get notifications for the current user with pagination
 router.get("/notifications", auth, async (req, res) => {
