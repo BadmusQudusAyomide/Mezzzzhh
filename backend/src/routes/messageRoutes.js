@@ -12,6 +12,8 @@ const {
   removeReaction,
   getThreadMessages,
   uploadVoiceNote,
+  uploadImageMessage,
+  uploadVideoMessage,
 } = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
 const multer = require('multer');
@@ -37,6 +39,12 @@ router.post('/', auth, sendMessage);
 
 // Upload a voice note
 router.post('/voice', auth, upload.single('audio'), uploadVoiceNote);
+
+// Upload an image message
+router.post('/image', auth, upload.single('image'), uploadImageMessage);
+
+// Upload a video message
+router.post('/video', auth, upload.single('video'), uploadVideoMessage);
 
 // Mark message as read
 router.put('/:messageId/read', auth, markAsRead);

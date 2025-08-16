@@ -20,12 +20,18 @@ const messageSchema = new mongoose.Schema(
     },
     messageType: {
       type: String,
-      enum: ["text", "image", "file", "audio"],
+      enum: ["text", "image", "file", "audio", "video"],
       default: "text",
     },
     // For audio messages
     audioUrl: { type: String, default: null },
     audioDuration: { type: Number, default: null },
+    // For image messages
+    imageUrl: { type: String, default: null },
+    // For video messages
+    videoUrl: { type: String, default: null },
+    videoPoster: { type: String, default: null },
+    videoDuration: { type: Number, default: null },
     // Thread root id. For a root message, threadId can be the same as _id.
     // For replies, threadId points to the root message _id.
     threadId: {

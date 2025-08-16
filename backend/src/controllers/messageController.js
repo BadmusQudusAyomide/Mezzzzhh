@@ -198,6 +198,159 @@ const uploadVoiceNote = async (req, res) => {
   }
 };
 
+// @desc    Upload image and create image message
+// @route   POST /api/messages/image
+// @access  Private
+const uploadImageMessage = async (req, res) => {
+  try {
+    const senderId = req.user._id;
+    const { recipientId, replyTo = null } = req.body;
+    const file = req.file;
+
+    if (!recipientId) return res.status(400).json({ error: 'recipientId is required' });
+    if (!file) return res.status(400).json({ error: 'image file is required' });
+
+    const recipient = await User.findById(recipientId);
+    if (!recipient) return res.status(404).json({ error: 'Recipient not found' });
+
+    let threadId = null;
+    if (replyTo) {
+      const parent = await Message.findById(replyTo);
+      if (parent) threadId = parent.threadId ? parent.threadId : parent._id;
+    }
+
+    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    const uploadResult = await cloudinary.uploader.upload(dataUri, {
+      resource_type: 'image',
+      folder: 'mesh/images',
+      quality: 'auto:low',
+      fetch_format: 'auto',
+    });
+
+    const message = new Message({
+      sender: senderId,
+      recipient: recipientId,
+      content: '',
+      messageType: 'image',
+      imageUrl: uploadResult.secure_url,
+      replyTo: replyTo || null,
+      threadId,
+    });
+    await message.save();
+    if (!replyTo && !message.threadId) {
+      message.threadId = message._id;
+      await message.save();
+    }
+
+    await message.populate('sender', 'username fullName avatar');
+    await message.populate('recipient', 'username fullName avatar');
+    if (message.replyTo) {
+      await message.populate({
+        path: 'replyTo',
+        populate: [
+          { path: 'sender', select: 'username fullName avatar' },
+          { path: 'recipient', select: 'username fullName avatar' },
+        ],
+      });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(recipientId.toString()).emit('newMessage', message);
+      io.to(senderId.toString()).emit('messageSent', message);
+    }
+
+    sendPushToUser(recipientId, {
+      title: 'New photo',
+      body: `${req.user.fullName} sent a photo`,
+      url: `/inbox`,
+      tag: 'mesh-message',
+    });
+
+    res.status(201).json({ message });
+  } catch (error) {
+    console.error('Upload image message error:', error);
+    res.status(500).json({ error: 'Server error while uploading image' });
+  }
+};
+
+// @desc    Upload video and create video message
+// @route   POST /api/messages/video
+// @access  Private
+const uploadVideoMessage = async (req, res) => {
+  try {
+    const senderId = req.user._id;
+    const { recipientId, replyTo = null } = req.body;
+    const file = req.file;
+
+    if (!recipientId) return res.status(400).json({ error: 'recipientId is required' });
+    if (!file) return res.status(400).json({ error: 'video file is required' });
+
+    const recipient = await User.findById(recipientId);
+    if (!recipient) return res.status(404).json({ error: 'Recipient not found' });
+
+    let threadId = null;
+    if (replyTo) {
+      const parent = await Message.findById(replyTo);
+      if (parent) threadId = parent.threadId ? parent.threadId : parent._id;
+    }
+
+    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    const uploadResult = await cloudinary.uploader.upload(dataUri, {
+      resource_type: 'video',
+      folder: 'mesh/videos',
+      // Prefer streaming-friendly formats; Cloudinary provides byte-range support
+      eager_async: false,
+    });
+
+    const message = new Message({
+      sender: senderId,
+      recipient: recipientId,
+      content: '',
+      messageType: 'video',
+      videoUrl: uploadResult.secure_url,
+      videoDuration: uploadResult.duration || null,
+      replyTo: replyTo || null,
+      threadId,
+    });
+    await message.save();
+    if (!replyTo && !message.threadId) {
+      message.threadId = message._id;
+      await message.save();
+    }
+
+    await message.populate('sender', 'username fullName avatar');
+    await message.populate('recipient', 'username fullName avatar');
+    if (message.replyTo) {
+      await message.populate({
+        path: 'replyTo',
+        populate: [
+          { path: 'sender', select: 'username fullName avatar' },
+          { path: 'recipient', select: 'username fullName avatar' },
+        ],
+      });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(recipientId.toString()).emit('newMessage', message);
+      io.to(senderId.toString()).emit('messageSent', message);
+    }
+
+    sendPushToUser(recipientId, {
+      title: 'New video',
+      body: `${req.user.fullName} sent a video`,
+      url: `/inbox`,
+      tag: 'mesh-message',
+    });
+
+    res.status(201).json({ message });
+  } catch (error) {
+    console.error('Upload video message error:', error);
+    res.status(500).json({ error: 'Server error while uploading video' });
+  }
+};
+
 // @desc    Return total unread messages for current user
 // @route   GET /api/messages/unread-count/total
 // @access  Private
@@ -275,16 +428,18 @@ const getMessages = async (req, res) => {
     const limited = hasMore ? messages.slice(0, limit) : messages;
     const orderedAsc = limited.slice().reverse();
 
-    // Mark messages as read
-    const unreadMessages = orderedAsc.filter(
-      (msg) => msg.recipient.toString() === currentUserId.toString() && !msg.isRead
+    // Mark ALL unread messages in this conversation as read (not just the current page)
+    // This ensures Inbox unread badges clear after opening the chat.
+    await Message.updateMany(
+      {
+        sender: otherUserId,
+        recipient: currentUserId,
+        isRead: false,
+      },
+      {
+        $set: { isRead: true, readAt: new Date() },
+      }
     );
-    if (unreadMessages.length > 0) {
-      await Message.updateMany(
-        { _id: { $in: unreadMessages.map((m) => m._id) } },
-        { $set: { isRead: true } }
-      );
-    }
 
     res.json({ messages: orderedAsc, hasMore });
   } catch (error) {
@@ -610,4 +765,6 @@ module.exports = {
   removeReaction,
   getUnreadCount,
   uploadVoiceNote,
+  uploadImageMessage,
+  uploadVideoMessage,
 };
