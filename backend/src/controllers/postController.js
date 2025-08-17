@@ -36,7 +36,7 @@ const getPosts = async (req, res) => {
     const limit = parseInt(req.query.limit || 10);
     const skip = (page - 1) * limit;
 
-    // Total count for pagination
+   
     const totalPosts = await Post.countDocuments();
     const totalPages = Math.ceil(totalPosts / limit) || 1;
     const hasMore = page < totalPages;
