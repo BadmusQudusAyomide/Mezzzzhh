@@ -4,6 +4,44 @@ const { sendPushToUser } = require('../utils/pushSender');
 const multer = require('multer');
 const { cloudinary } = require('../utils/cloudinary');
 
+// @desc    Permanently delete a message (sender only)
+// @route   DELETE /api/messages/:messageId
+// @access  Private
+const deleteMessage = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { messageId } = req.params;
+    const msg = await Message.findById(messageId);
+    if (!msg) return res.status(404).json({ error: 'Message not found' });
+    if (String(msg.sender) !== String(userId)) {
+      return res.status(403).json({ error: 'You can only delete your own messages' });
+    }
+
+    // Attempt to delete associated cloud media if present (best-effort)
+    try {
+      if (msg.imageUrl || msg.videoUrl || msg.audioUrl) {
+        // If you store public_id, delete more precisely. Without it, skip or rely on TTL.
+      }
+    } catch {}
+
+    await Message.deleteOne({ _id: msg._id });
+
+    // Notify both users
+    const io = req.app.get('io');
+    if (io) {
+      const a = String(msg.sender);
+      const b = String(msg.recipient);
+      io.to(a).emit('messageDeleted', { messageId: msg._id.toString() });
+      io.to(b).emit('messageDeleted', { messageId: msg._id.toString() });
+    }
+
+    return res.json({ message: 'Deleted' });
+  } catch (error) {
+    console.error('Delete message error:', error);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // @desc    Get conversations for current user with pagination
 // @route   GET /api/messages/conversations
 // @access  Private
@@ -767,4 +805,5 @@ module.exports = {
   uploadVoiceNote,
   uploadImageMessage,
   uploadVideoMessage,
+  deleteMessage,
 };

@@ -14,6 +14,7 @@ const {
   uploadVoiceNote,
   uploadImageMessage,
   uploadVideoMessage,
+  deleteMessage,
 } = require('../controllers/messageController');
 const { auth } = require('../middleware/auth');
 const multer = require('multer');
@@ -51,6 +52,9 @@ router.put('/:messageId/read', auth, markAsRead);
 
 // Edit a message
 router.put('/:messageId', auth, editMessage);
+
+// Delete a message (for everyone)
+router.delete('/:messageId', auth, deleteMessage);
 
 // Reactions
 router.post('/:messageId/reactions', auth, addReaction);
