@@ -15,7 +15,6 @@ const userRoutes = require("./src/routes/userRoutes");
 const messageRoutes = require("./src/routes/messageRoutes");
 const pushRoutes = require("./src/routes/push");
 
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
@@ -26,7 +25,6 @@ const io = new Server(server, {
       "http://127.0.0.1:5173",
       "https://mesh-blush.vercel.app",
       "https://mesh-blush.vercel.app/",
-      "https://mezzzzhh-production.up.railway.app",
     ],
     credentials: true,
   },
@@ -42,7 +40,6 @@ app.use(
       "http://127.0.0.1:5173",
       "https://mesh-blush.vercel.app",
       "https://mesh-blush.vercel.app/",
-      "https://mezzzzhh-production.up.railway.app",
     ],
     credentials: true,
   })
@@ -67,9 +64,10 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-
 // Database connection
-console.log(`Attempting to connect to MongoDB... URI loaded: ${!!process.env.MONGODB_URI}`);
+console.log(
+  `Attempting to connect to MongoDB... URI loaded: ${!!process.env.MONGODB_URI}`
+);
 mongoose
   .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/mesh")
   .then(() => {
@@ -82,7 +80,7 @@ mongoose
   });
 
 // Routes
-// Root endpoint for Railway health check
+// Root endpoint for health check
 app.get("/", (req, res) => {
   res.json({
     message: "Welcome to Mesh API",
