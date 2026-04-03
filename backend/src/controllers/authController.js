@@ -1,6 +1,10 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Post = require("../models/Post");
+const Story = require("../models/Story");
 const fetch = global.fetch || require("node-fetch");
+const crypto = require("crypto");
+const { sendMail, hasMailConfig } = require("../utils/mailer");
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -8,6 +12,10 @@ const generateToken = (userId) => {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 };
+
+const createPasswordResetToken = () => crypto.randomBytes(32).toString("hex");
+const hashPasswordResetToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
 // @desc    List users excluding current user, with search & pagination (recently joined first)
 // @route   GET /api/auth/users
@@ -50,6 +58,110 @@ const getUsers = async (req, res) => {
   } catch (error) {
     console.error('Get users list error:', error);
     return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// @desc    Global search across users, posts, and stories
+// @route   GET /api/auth/search
+// @access  Private
+const searchAll = async (req, res) => {
+  try {
+    const query = String(req.query.query || req.query.q || "").trim();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 8, 20);
+
+    if (!query) {
+      return res.json({ users: [], posts: [], stories: [], query: "" });
+    }
+
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(escaped, "i");
+    const matchingUsers = await User.find({
+      _id: { $ne: req.user._id },
+      $or: [{ username: regex }, { fullName: regex }, { bio: regex }],
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select("username fullName avatar isVerified followers bio createdAt");
+
+    const matchingUserIds = matchingUsers.map((user) => user._id);
+
+    const [posts, stories] = await Promise.all([
+      Post.find({
+        $or: [{ content: regex }, { user: { $in: matchingUserIds } }],
+      })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate({
+          path: "user",
+          select: "username fullName avatar isVerified",
+          options: { strictPopulate: false },
+        }),
+
+      Story.find({
+        expiresAt: { $gt: new Date() },
+        $or: [{ caption: regex }, { user: { $in: matchingUserIds } }],
+      })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate("user", "username fullName avatar isVerified"),
+    ]);
+
+    const userResults = matchingUsers.map((u) => ({
+      _id: u._id,
+      username: u.username,
+      fullName: u.fullName,
+      avatar: u.avatar,
+      isVerified: !!u.isVerified,
+      bio: u.bio || "",
+      followerCount: Array.isArray(u.followers) ? u.followers.length : 0,
+      createdAt: u.createdAt,
+    }));
+
+    const postResults = posts
+      .filter((post) => post.user)
+      .map((post) => ({
+        _id: post._id,
+        content: post.content,
+        image: post.image,
+        createdAt: post.createdAt,
+        likesCount: Array.isArray(post.likes) ? post.likes.length : 0,
+        commentsCount: Array.isArray(post.comments) ? post.comments.length : 0,
+        user: {
+          _id: post.user._id,
+          username: post.user.username,
+          fullName: post.user.fullName,
+          avatar: post.user.avatar,
+          isVerified: !!post.user.isVerified,
+        },
+      }));
+
+    const storyResults = stories
+      .filter((story) => story.user)
+      .map((story) => ({
+        _id: story._id,
+        caption: story.caption || "",
+        mediaUrl: story.mediaUrl,
+        mediaType: story.mediaType,
+        createdAt: story.createdAt,
+        expiresAt: story.expiresAt,
+        user: {
+          _id: story.user._id,
+          username: story.user.username,
+          fullName: story.user.fullName,
+          avatar: story.user.avatar,
+          isVerified: !!story.user.isVerified,
+        },
+      }));
+
+    return res.json({
+      query,
+      users: userResults,
+      posts: postResults,
+      stories: storyResults,
+    });
+  } catch (error) {
+    console.error("Global search error:", error);
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -396,6 +508,116 @@ const logout = async (req, res) => {
   }
 };
 
+// @desc    Request password reset email
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await User.findOne({ email }).select(
+      "+resetPasswordToken +resetPasswordExpires"
+    );
+
+    const successMessage =
+      "If an account exists for that email, a reset link has been sent.";
+
+    if (!user || user.provider) {
+      return res.json({ message: successMessage });
+    }
+
+    const rawToken = createPasswordResetToken();
+    const hashedToken = hashPasswordResetToken(rawToken);
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 30);
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = expiresAt;
+    await user.save();
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(
+      rawToken
+    )}`;
+
+    const subject = "Reset your Mesh password";
+    const text = [
+      `Hello ${user.fullName || user.username},`,
+      "",
+      "We received a request to reset your Mesh password.",
+      `Reset it here: ${resetUrl}`,
+      "",
+      "This link will expire in 30 minutes.",
+      "If you did not request this, you can ignore this email.",
+    ].join("\n");
+
+    const html = `
+      <p>Hello ${user.fullName || user.username},</p>
+      <p>We received a request to reset your Mesh password.</p>
+      <p><a href="${resetUrl}">Reset your password</a></p>
+      <p>This link will expire in 30 minutes.</p>
+      <p>If you did not request this, you can ignore this email.</p>
+    `;
+
+    await sendMail({
+      to: user.email,
+      subject,
+      text,
+      html,
+    });
+
+    if (!hasMailConfig()) {
+      console.warn("[auth] Password reset email skipped; use this URL:", resetUrl);
+    }
+
+    return res.json({ message: successMessage });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({ error: "Server error during password reset request" });
+  }
+};
+
+// @desc    Reset password using token
+// @route   POST /api/auth/reset-password/:token
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const token = String(req.params?.token || "").trim();
+    const password = String(req.body?.password || "");
+
+    if (!token) {
+      return res.status(400).json({ error: "Reset token is required" });
+    }
+    if (!password || password.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters long" });
+    }
+
+    const hashedToken = hashPasswordResetToken(token);
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select("+resetPasswordToken +resetPasswordExpires");
+
+    if (!user) {
+      return res.status(400).json({ error: "Reset link is invalid or has expired" });
+    }
+
+    user.password = password;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({ error: "Server error during password reset" });
+  }
+};
+
 // @desc    Get user profile by username
 // @route   GET /api/auth/profile/:username
 // @access  Public
@@ -500,6 +722,9 @@ module.exports = {
   getMe,
   getUserSuggestions,
   getUsers,
+  searchAll,
+  forgotPassword,
+  resetPassword,
   updateProfile,
   logout,
   getUserProfile,

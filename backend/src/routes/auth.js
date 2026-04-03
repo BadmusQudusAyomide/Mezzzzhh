@@ -7,6 +7,9 @@ const {
   getMe,
   getUserSuggestions,
   getUsers,
+  searchAll,
+  forgotPassword,
+  resetPassword,
   updateProfile,
   logout,
   getUserProfile,
@@ -22,6 +25,8 @@ const {
 // Public routes
 router.post("/register", register);
 router.post("/login", login);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
 
 
 // Protected routes
@@ -30,6 +35,7 @@ router.put("/profile", auth, updateProfile);
 router.post("/logout", auth, logout);
 router.get("/suggestions", auth, getUserSuggestions);
 router.get("/users", auth, getUsers);
+router.get("/search", auth, searchAll);
 
 // Profile routes
 router.get("/profile/:username", getUserProfile); // Public route

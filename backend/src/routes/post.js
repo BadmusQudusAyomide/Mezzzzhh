@@ -9,11 +9,19 @@ const {
   addComment,
   deletePost,
 } = require("../controllers/postController");
+const {
+  getStories,
+  createStory,
+  markStoryViewed,
+} = require("../controllers/storyController");
 const Notification = require("../models/Notification");
 
 
 // Create a new post
 router.post("/", auth, createPost);
+router.get("/stories", auth, getStories);
+router.post("/stories", auth, createStory);
+router.post("/stories/:storyId/view", auth, markStoryViewed);
 // Get all posts
 router.get("/", getPosts);
 // Get all posts by a specific user
