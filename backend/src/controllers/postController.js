@@ -152,6 +152,46 @@ const getPostsByUsername = async (req, res) => {
   }
 };
 
+// @desc    Get a single post by id
+// @route   GET /api/posts/:postId
+// @access  Public
+const getPostById = async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    const post = await Post.findById(postId)
+      .populate({
+        path: "user",
+        select: "fullName username avatar isVerified",
+        options: { strictPopulate: false },
+      })
+      .populate({
+        path: "comments.user",
+        select: "_id fullName username avatar isVerified",
+        options: { strictPopulate: false },
+      });
+
+    if (!post || !post.user) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    const postObject = post.toObject();
+    postObject.userId = post.user && post.user._id ? post.user._id : post.user;
+    postObject.likes = Array.isArray(postObject.likes) ? postObject.likes : [];
+    postObject.comments = Array.isArray(postObject.comments)
+      ? postObject.comments
+      : [];
+
+    return res.json({ post: postObject });
+  } catch (error) {
+    console.error("Get post by id error:", error.message, error.stack);
+    return res.status(500).json({
+      error: "Server error while fetching post",
+      details: error.message,
+    });
+  }
+};
+
 // @desc    Like or unlike a post
 // @route   POST /api/posts/:postId/like
 // @access  Private
@@ -287,6 +327,7 @@ module.exports = {
   createPost,
   getPosts,
   getPostsByUsername,
+  getPostById,
   likePost,
   addComment,
 };

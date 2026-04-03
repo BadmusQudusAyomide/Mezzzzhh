@@ -5,6 +5,7 @@ const {
   createPost,
   getPosts,
   getPostsByUsername,
+  getPostById,
   likePost,
   addComment,
   deletePost,
@@ -70,5 +71,8 @@ router.get("/notifications", auth, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch notifications" });
   }
 });
+
+// Get a single post by id
+router.get("/:postId", getPostById);
 
 module.exports = router;
