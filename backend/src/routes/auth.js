@@ -8,6 +8,7 @@ const {
   getUserSuggestions,
   getUsers,
   searchAll,
+  checkUsernameAvailability,
   forgotPassword,
   resetPassword,
   updateProfile,
@@ -33,6 +34,7 @@ router.post("/reset-password/:token", resetPassword);
 router.get("/me", auth, getMe);
 router.put("/profile", auth, updateProfile);
 router.post("/logout", auth, logout);
+router.get("/username-available", auth, checkUsernameAvailability);
 router.get("/suggestions", auth, getUserSuggestions);
 router.get("/users", auth, getUsers);
 router.get("/search", auth, searchAll);

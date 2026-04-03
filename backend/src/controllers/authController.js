@@ -432,6 +432,7 @@ const getMe = async (req, res) => {
 const updateProfile = async (req, res) => {
   try {
     const {
+      username,
       fullName,
       bio,
       website,
@@ -453,6 +454,30 @@ const updateProfile = async (req, res) => {
       return res.status(404).json({
         error: "User not found",
       });
+    }
+
+    if (username !== undefined) {
+      const normalized = String(username).trim().toLowerCase();
+      if (!normalized) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+      const usernameRegex = /^[a-z0-9._]{3,30}$/;
+      if (!usernameRegex.test(normalized)) {
+        return res.status(400).json({
+          error:
+            "Username must be 3-30 characters and use letters, numbers, dots, or underscores",
+        });
+      }
+      if (normalized !== user.username) {
+        const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const existing = await User.findOne({
+          username: new RegExp(`^${escaped}$`, "i"),
+        });
+        if (existing && existing._id.toString() !== user._id.toString()) {
+          return res.status(400).json({ error: "Username is already taken" });
+        }
+        user.username = normalized;
+      }
     }
 
     // Update fields
@@ -482,6 +507,40 @@ const updateProfile = async (req, res) => {
     res.status(500).json({
       error: "Server error during profile update",
     });
+  }
+};
+
+// @desc    Check if a username is available
+// @route   GET /api/auth/username-available?username=...
+// @access  Private
+const checkUsernameAvailability = async (req, res) => {
+  try {
+    const raw = String(req.query.username || "").trim().toLowerCase();
+    if (!raw) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+    const usernameRegex = /^[a-z0-9._]{3,30}$/;
+    if (!usernameRegex.test(raw)) {
+      return res.status(400).json({
+        error:
+          "Username must be 3-30 characters and use letters, numbers, dots, or underscores",
+      });
+    }
+
+    const current = await User.findById(req.user._id).select("username");
+    if (current && current.username === raw) {
+      return res.json({ available: true, reason: "current" });
+    }
+
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const existing = await User.findOne({
+      username: new RegExp(`^${escaped}$`, "i"),
+    }).select("_id");
+
+    return res.json({ available: !existing });
+  } catch (error) {
+    console.error("Username availability error:", error);
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -726,6 +785,7 @@ module.exports = {
   forgotPassword,
   resetPassword,
   updateProfile,
+  checkUsernameAvailability,
   logout,
   getUserProfile,
   followUser,
